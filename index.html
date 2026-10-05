@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>원어 성경</title>
+<meta name="description" content="히브리어·헬라어 원어 성경과 BSB 영어 번역을 단어별로 연결해 보여 주는 공부 앱">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F6F7F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12151B" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="원어 성경">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+:root{
+  --paper:#F6F7F4; --sheet:#FFFFFF; --ink:#1C2230; --muted:#677086; --lapis:#2C4A9A; --wash:#DFE6F7; --wash2:#EEF2FB; --line:#DADDE4;
+  --serif:"Gentium Book Plus","Gentium Plus","Times New Roman",serif;
+  --heb:"Noto Serif Hebrew","SBL Hebrew","Times New Roman",serif;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#12151B;--sheet:#1A1E26;--ink:#E4E7EE;--muted:#949CB0;--lapis:#97B0F2;--wash:#2A3858;--wash2:#1F2840;--line:#2C313D;}}
+:root[data-theme="dark"]{--paper:#12151B;--sheet:#1A1E26;--ink:#E4E7EE;--muted:#949CB0;--lapis:#97B0F2;--wash:#2A3858;--wash2:#1F2840;--line:#2C313D;}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 64px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-text-size-adjust:100%}
+button{font-family:inherit;color:inherit}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:6px}
+.nav{width:38px;height:38px;border:none;background:none;border-radius:50%;font-size:1.4rem;line-height:1;cursor:pointer;color:var(--ink)}
+.nav:hover{background:var(--wash2)}.nav:disabled{opacity:.25;cursor:default;background:none}
+.title{border:none;background:none;cursor:pointer;font-family:var(--serif);font-size:1.35rem;padding:4px 8px;border-radius:8px;white-space:nowrap}
+.title:hover{background:var(--wash2)}
+.title::after{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-3px,-3px);margin-left:10px}
+.bar .sp{flex:1}
+.toggle{white-space:nowrap;font:500 .85rem var(--sans);background:none;border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+.toggle[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+main{max-width:1120px;margin:0 auto;padding:8px 20px 80px;display:grid;grid-template-columns:minmax(0,1fr);gap:40px}
+@media (min-width:680px){main{grid-template-columns:minmax(0,1fr) 300px;gap:24px;padding:8px 16px 80px}.gk.he{font-size:1.6rem}}
+@media (min-width:1000px){main{grid-template-columns:minmax(0,640px) 380px;gap:40px;padding:8px 20px 80px;justify-content:space-between}.gk.he{font-size:1.75rem}}
+.verse{display:grid;grid-template-columns:2.6rem minmax(0,1fr);padding:18px 0;border-bottom:1px solid var(--line)}
+.vn{font:600 .8rem var(--sans);color:var(--lapis);padding-top:.6rem}
+.vn small{display:block;font-weight:400;color:var(--muted);font-size:.68rem;margin-top:2px}
+.gk{font-family:var(--serif);font-size:1.5rem;line-height:1.75}
+.gk.he{font-family:var(--heb);font-size:1.75rem;line-height:2;direction:rtl;text-align:right}
+.en{font-family:var(--serif);font-size:1.05rem;line-height:1.7;color:var(--muted);margin-top:6px}
+body.hide-en .en{display:none}
+.w,.e{cursor:pointer;border-radius:4px;transition:background-color .12s}
+.w:hover,.e:hover{background:var(--wash2)}
+.w:focus-visible,.e:focus-visible{outline:2px solid var(--lapis);outline-offset:1px}
+.on{background:var(--wash)!important;color:var(--ink);box-shadow:inset 0 -2px 0 var(--lapis)}
+.cur{background:var(--lapis)!important;color:var(--paper)!important;box-shadow:none}
+.status{padding:60px 0;color:var(--muted);line-height:1.7}
+.status button{margin-top:12px}
+.next{display:flex;justify-content:space-between;gap:12px;padding:28px 0}
+.pill{font:500 .9rem var(--sans);background:none;border:1px solid var(--line);border-radius:999px;padding:9px 16px;cursor:pointer}
+.pill:hover{background:var(--wash2)}
+aside{position:relative}
+.panel{background:var(--sheet);border:1px solid var(--line);border-radius:14px;padding:22px 22px 26px}
+@media (min-width:680px){.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 76px);max-height:calc(100vh - 100px);overflow:auto}}
+@media (max-width:679px){
+  aside{position:fixed;left:0;right:0;bottom:0;z-index:10;pointer-events:none}
+  .panel{pointer-events:auto;border-radius:18px 18px 0 0;border-bottom:none;max-height:55vh;overflow:auto;padding-bottom:calc(26px + env(safe-area-inset-bottom,0px));transform:translateY(105%);transition:transform .25s ease;box-shadow:0 -8px 30px rgba(20,25,40,.18)}
+  .panel.open{transform:none}
+  body.sheet main{padding-bottom:60vh}
+  .grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:-8px auto 14px}
+  .toggle{padding:7px 11px}
+}
+@media (min-width:680px){.grab,.close{display:none}.panel{padding:18px 18px 22px}.word{font-size:2.2rem}}
+@media (min-width:1000px){.panel{padding:22px 22px 26px}.word{font-size:2.6rem}}
+@media (prefers-reduced-motion:reduce){.panel,.picker{transition:none}}
+.close{position:absolute;top:14px;right:14px;border:none;background:var(--wash2);width:34px;height:34px;border-radius:50%;font-size:1.1rem;cursor:pointer}
+.empty{color:var(--muted);font-size:.95rem;line-height:1.7}
+.empty b{font-family:var(--serif);font-size:1.6rem;color:var(--ink);font-weight:400;display:block;margin-bottom:8px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+.tabs button{font:1.1rem var(--serif);border:1px solid var(--line);background:none;border-radius:8px;padding:3px 10px;cursor:pointer}
+.tabs button.h{font-family:var(--heb);font-size:1.25rem}
+.tabs button[aria-pressed="true"]{border-color:var(--lapis);color:var(--lapis);background:var(--wash2)}
+.word{font-family:var(--serif);font-size:2.6rem;line-height:1.2;padding-right:40px}
+.word.h{font-family:var(--heb);direction:rtl;text-align:left;unicode-bidi:plaintext}
+.tr{font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--muted);margin-top:4px}
+.tr b{color:var(--ink);font-weight:700}
+.ctx{margin-top:10px;font-size:.92rem}
+.ctx em{font-family:var(--serif);font-style:normal;font-size:1.05rem;color:var(--lapis)}
+h3{font:600 .82rem var(--sans);color:var(--muted);margin:22px 0 8px}
+.root{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.root .l{font-family:var(--serif);font-size:1.5rem}
+.root .l.h{font-family:var(--heb);font-size:1.6rem}
+.root .lt{font-family:var(--serif);font-style:italic;color:var(--muted)}
+.root .sn{font:500 .8rem var(--sans);color:var(--lapis);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+.gl{margin-top:4px;font-size:.95rem}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+td{padding:6px 0;border-bottom:1px solid var(--line);vertical-align:baseline}
+td:first-child{color:var(--muted);width:4.5rem}
+td small{color:var(--muted);margin-left:6px;font-size:.78rem}
+.def{font-family:var(--serif);font-size:1rem;line-height:1.65;overflow:hidden}
+.def.clip{max-height:14em;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.def .ref{color:var(--lapis);font-size:.9em;white-space:nowrap}
+.more{margin-top:8px;font:500 .85rem var(--sans);color:var(--lapis);background:none;border:none;padding:4px 0;cursor:pointer}
+.src{font-size:.75rem;color:var(--muted);margin-top:6px}
+/* picker */
+.picker{position:fixed;inset:0;z-index:20;background:var(--paper);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 20px calc(env(safe-area-inset-bottom,0px) + 40px);opacity:0;visibility:hidden;transition:opacity .15s}
+.picker.open{opacity:1;visibility:visible}
+.pk{max-width:900px;margin:0 auto}
+.pkhead{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.pkhead h2{font:400 1.4rem var(--serif);margin:0;flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;margin-bottom:18px}
+.seg button{border:none;background:none;padding:7px 18px;border-radius:999px;font:500 .9rem var(--sans);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.grid.ch{grid-template-columns:repeat(auto-fill,minmax(56px,1fr))}
+.grid button{border:1px solid var(--line);background:var(--sheet);border-radius:10px;padding:12px 8px;font:500 .95rem var(--sans);cursor:pointer;text-align:center}
+.grid button:hover{border-color:var(--lapis)}
+.grid button.sel{border-color:var(--lapis);color:var(--lapis);background:var(--wash2)}
+.opts{margin-top:28px;padding-top:18px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.9rem;color:var(--muted)}
+.opts.off{margin-top:14px;padding-top:14px}
+.offtxt{flex:1 1 260px;line-height:1.6}.offtxt b{display:block;color:var(--ink);font-weight:500}
+footer{max-width:1120px;margin:0 auto;padding:0 20px 40px;font-size:.78rem;line-height:1.7;color:var(--muted)}
+footer p{max-width:640px}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <button class="nav" id="prev" aria-label="이전 장">‹</button>
+  <button class="title" id="title" aria-haspopup="dialog">원어 성경</button>
+  <button class="nav" id="nextb" aria-label="다음 장">›</button>
+  <div class="sp"></div>
+  <button class="toggle" id="tgEn" aria-pressed="true">영어</button>
+</div></header>
+<main>
+  <div id="text"></div>
+  <aside><div class="panel" id="panel" aria-live="polite"></div></aside>
+</main>
+<footer><p>헬라어 본문 SBL Greek New Testament (Society of Biblical Literature, Logos Bible Software, CC BY 4.0). 히브리어 본문 Westminster Leningrad Codex (퍼블릭 도메인). 영어 Berean Standard Bible (퍼블릭 도메인). 단어 정렬 Biblica / Clear Bible Alignments, 헬라어 문법 Clear Bible Macula Greek (CC BY 4.0). 히브리어 문법과 음역, 사전 STEPBible.org TAHOT, TBESH, TBESG (CC BY). 헬라어 사전 뜻풀이 Abbott-Smith. 글꼴 Gentium Book Plus, Noto Serif Hebrew, IBM Plex Sans KR (SIL Open Font License).</p></footer>
+<div class="picker" id="picker" role="dialog" aria-modal="true" aria-label="성경 선택"><div class="pk" id="pk"></div></div>
+<script>
+let PT=[];
+const BOOKS=["창세기","출애굽기","레위기","민수기","신명기","여호수아","사사기","룻기","사무엘상","사무엘하","열왕기상","열왕기하","역대상","역대하","에스라","느헤미야","에스더","욥기","시편","잠언","전도서","아가","이사야","예레미야","예레미야애가","에스겔","다니엘","호세아","요엘","아모스","오바댜","요나","미가","나훔","하박국","스바냐","학개","스가랴","말라기","마태복음","마가복음","누가복음","요한복음","사도행전","로마서","고린도전서","고린도후서","갈라디아서","에베소서","빌립보서","골로새서","데살로니가전서","데살로니가후서","디모데전서","디모데후서","디도서","빌레몬서","히브리서","야고보서","베드로전서","베드로후서","요한일서","요한이서","요한삼서","유다서","요한계시록"];
+const CHAP=[50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8,66,52,5,48,12,14,3,9,1,4,7,3,3,3,2,14,4,28,16,24,21,28,16,16,13,6,6,4,4,5,3,6,4,3,1,13,5,5,3,5,1,1,1,22];
+const bookFile=b=>'books/'+String(b).padStart(2,'0')+'.json';
+const isOT=b=>b<=39;
+const WIDE='(min-width:680px)';
+const cache={};
+function load(name){
+  if(!cache[name])cache[name]=fetch('data/'+name).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()})
+    .catch(e=>{delete cache[name];throw e});
+  return cache[name];
+}
+const loadPT=()=>load('pt.json').then(d=>{PT=d});
+const LEX={};
+function lexFor(b){const n=isOT(b)?'hlx':'glx';if(!LEX[n])load(n+'.json').then(d=>{LEX[n]=d;if(state.sel)renderPanel()}).catch(()=>{});return LEX[n]}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let opts={en:true,cant:false};
+try{Object.assign(opts,JSON.parse(localStorage.getItem('ob-opts')||'{}'))}catch(e){}
+const saveOpts=()=>{try{localStorage.setItem('ob-opts',JSON.stringify(opts))}catch(e){}};
+const heb=t=>opts.cant?t:t.replace(/[\u0591-\u05AF\u05C0\u05C3\u05C6]/g,m=>m==='\u05C3'?'׃':'').replace(/\u05BD/g,'');
+function fmtTr(t,ot){if(!t)return'';if(!ot)return esc(t);
+  return t.split(/[.\-]/).filter(Boolean).map(s=>/[A-Z]/.test(s)?'<b>'+esc(s.toLowerCase())+'</b>':esc(s.toLowerCase())).join('·')}
+const state={b:43,c:1,data:null,ch:null,sel:null,gp:{},ge:{}};
+try{const s=JSON.parse(localStorage.getItem('ob-pos')||'null');if(s&&s.b&&s.c){state.b=s.b;state.c=s.c}}catch(e){}
+const $=id=>document.getElementById(id);
+const panel=$('panel'),text=$('text');
+const emptyHTML=`<div class="grab"></div><div class="empty"><b>단어를 눌러 보세요</b>원어 단어나 영어 단어를 누르면 서로 짝이 되는 단어가 함께 표시되고, 이곳에 발음, 어근, 문법, 사전 뜻풀이가 나타납니다.</div>`;
+async function go(b,c){
+  b=Math.max(1,Math.min(66,b));c=Math.max(1,Math.min(CHAP[b-1],c));
+  state.b=b;state.c=c;state.sel=null;closePanel(true);
+  try{localStorage.setItem('ob-pos',JSON.stringify({b,c}))}catch(e){}
+  $('title').textContent=`${BOOKS[b-1]} ${c}${b===19?'편':'장'}`;document.title=`${BOOKS[b-1]} ${c} — 원어 성경`;
+  $('prev').disabled=(b===1&&c===1);$('nextb').disabled=(b===66&&c===CHAP[65]);
+  const name=bookFile(b);
+  if(!state.loaded?.[name])text.innerHTML=`<div class="status">${BOOKS[b-1]} 본문을 불러오는 중입니다…</div>`;
+  lexFor(b);
+  let bk;
+  try{[bk]=await Promise.all([load(name),PT.length?0:loadPT()]);(state.loaded??={})[name]=1;
+    // 첫 방문처럼 서비스 워커가 아직 일하기 전이면 직접 저장해 둠
+    if(!navigator.serviceWorker?.controller&&'caches' in window&&location.protocol!=='file:')caches.open(DATA_CACHE).then(c=>c.add('data/'+name)).catch(()=>{})}catch(e){
+    text.innerHTML=`<div class="status">본문을 불러오지 못했습니다. 이 책을 아직 기기에 저장하지 않았다면 인터넷 연결을 확인한 뒤 다시 시도해 주세요.<br><button class="pill" id="retry">다시 시도</button></div>`;
+    $('retry').onclick=()=>go(b,c);return}
+  if(state.b!==b||state.c!==c)return;
+  const ch=bk.c.find(x=>x[0]===c);
+  state.ch=ch?ch[1]:[];render();window.scrollTo(0,0);
+}
+function render(){
+  const ot=isOT(state.b);const V=state.ch;const gp={},ge={};
+  let h='';
+  V.forEach((v,vi)=>{
+    const [vn,hl,words,eng]=v;
+    let gk=words.map((w,wi)=>{w[3].forEach((p,pi)=>{if(p[4]>=0)(gp[p[4]]??=[]).push([vi,wi,pi])});
+      const t=ot?heb(w[0]):w[0];
+      return `<span class="w" data-w="${vi}.${wi}" tabindex="0">${esc(t)}</span>${ot?(w[1]===''?'':' '):esc(w[1]||' ')}`}).join('');
+    let en='';eng.forEach((t,ti)=>{if(t[2]>=0)(ge[t[2]]??=[]).push([vi,ti]);
+      en+=`<span class="e" data-e="${vi}.${ti}"${t[1]&2?'':' tabindex="0"'}>${esc(t[0])}</span>`+(t[1]&1?'':' ')});
+    const lab=(Array.isArray(vn)?vn:[vn]).map(x=>x===0?'표제':x).join(', ');
+    h+=`<section class="verse"><div class="vn">${lab}${hl?`<small>히 ${hl}</small>`:''}</div><div><div class="gk${ot?' he':''}" lang="${ot?'he':'grc'}">${gk}</div><div class="en" lang="en">${en}</div></div></section>`;
+  });
+  const b=state.b,c=state.c;
+  h+=`<div class="next"><button class="pill" data-go="-1"${b===1&&c===1?' hidden':''}>‹ 이전 장</button><button class="pill" data-go="1"${b===66&&c===CHAP[65]?' hidden':''}>다음 장 ›</button></div>`;
+  text.innerHTML=h;state.gp=gp;state.ge=ge;
+}
+function step(dir){let b=state.b,c=state.c+dir;if(c<1){b--;if(b<1)return;c=CHAP[b-1]}else if(c>CHAP[b-1]){b++;if(b>66)return;c=1}go(b,c)}
+const W=(vi,wi)=>state.ch[vi][2][wi];
+const wEl=(vi,wi)=>text.querySelector(`[data-w="${vi}.${wi}"]`);
+const eEl=(vi,ti)=>text.querySelector(`[data-e="${vi}.${ti}"]`);
+function clearHL(){text.querySelectorAll('.on,.cur').forEach(n=>n.classList.remove('on','cur'))}
+function hl(g){(state.gp[g]||[]).forEach(([vi,wi])=>wEl(vi,wi)?.classList.add('on'));(state.ge[g]||[]).forEach(([vi,ti])=>eEl(vi,ti)?.classList.add('on'))}
+function engFor(g){return(state.ge[g]||[]).map(([vi,ti])=>state.ch[vi][3][ti][0]).join(' ').replace(/ ([,.;:!?’”)])/g,'$1')}
+function mainPart(w){let best=0,bl=-1;w[3].forEach((p,i)=>{const s=(p[1].startsWith('H90')?0:10)+p[0].length;if(s>bl){bl=s;best=i}});return best}
+function renderPanel(){
+  const s=state.sel;if(!s)return;
+  if(s.sup){panel.innerHTML=`<div class="grab"></div><button class="close" aria-label="닫기">×</button><div class="word">${esc(s.sup)}</div><div class="empty" style="margin-top:12px">이 영어 단어에는 연결된 원어 단어가 없습니다. 번역자가 문장을 자연스럽게 하려고 보충한 말이거나, 시편 표제처럼 연결 자료가 없는 부분입니다.</div>`;return}
+  const ot=isOT(state.b);const [vi,wi,pi]=s.list[s.i];const w=W(vi,wi);const p=w[3][pi];
+  const LX=LEX[ot?'hlx':'glx'];const lx=LX?LX[p[1]]:null;
+  const H=ot?' h':'';
+  let tabs='';
+  if(s.list.length>1)tabs=`<div class="tabs">${s.list.map((x,i)=>`<button class="${ot?'h':''}" data-tab="${i}" aria-pressed="${i===s.i}">${esc(ot?heb(W(x[0],x[1])[3][x[2]][0]):W(x[0],x[1])[3][x[2]][0])}</button>`).join('')}</div>`;
+  const big=ot?heb(w[0]).replace(/[׃־]/g,''):w[0].replace(/[,.;·]/g,'');
+  const tr=ot?fmtTr(w[2],true):esc(w[2]);
+  const ctx=p[4]>=0&&engFor(p[4])?`<div class="ctx">이 구절의 번역: <em>${esc(engFor(p[4]))}</em></div>`:(p[3]?`<div class="ctx">직역: <em>${esc(p[3])}</em></div>`:'');
+  const rows=p[2]>=0?PT[p[2]]:[];
+  const tbl=rows.length?`<h3>문법 파싱</h3><table>${rows.map(r=>`<tr><td>${r[0]}</td><td>${esc(r[1])}${r[2]?`<small>${esc(r[2])}</small>`:''}</td></tr>`).join('')}</table>`:'';
+  const partNote=w[3].length>1&&ot?`<div class="src" style="margin-top:2px">이 단어는 ${w[3].length}개 부분으로 이루어져 있습니다. 아래 버튼으로 각 부분을 볼 수 있어요.</div>`:'';
+  let root='';
+  if(lx)root=`<h3>어근 (사전 기본형)</h3><div class="root"><span class="l${H}">${esc(lx[0])}</span><span class="lt">${ot?fmtTr(lx[1],true):esc(lx[1])}</span><span class="sn">${esc(p[1])}</span></div><div class="gl">기본 뜻: ${esc(lx[2])}</div>`;
+  else if(!LX)root=`<h3>어근 (사전 기본형)</h3><div class="empty">사전을 불러오는 중입니다…</div>`;
+  const def=lx&&lx[3]?`<h3>사전 뜻풀이</h3><div class="def clip" id="def">${lx[3]}</div><button class="more" id="more">전체 보기</button><div class="src">${ot?'STEPBible 히브리어 사전 (BDB 요약)':'Abbott-Smith 신약 헬라어 사전 (STEPBible)'}</div>`:'';
+  const curPart=w[3].length>1?`<h3>선택한 부분</h3><div class="root"><span class="l${H}">${esc(ot?heb(p[0]):p[0])}</span></div>`:'';
+  panel.innerHTML=`<div class="grab"></div><button class="close" aria-label="닫기">×</button><div class="word${H}" lang="${ot?'he':'grc'}">${esc(big)}</div><div class="tr">${tr}</div>${partNote}${tabs}${curPart}${ctx}${root}${tbl}${def}`;
+  panel.scrollTop=0;
+  const m=$('more');
+  if(m){const d=$('def');requestAnimationFrame(()=>{if(d.scrollHeight<=d.clientHeight+4){d.classList.remove('clip');m.remove()}});m.onclick=()=>{d.classList.toggle('clip');m.textContent=d.classList.contains('clip')?'전체 보기':'접기'}}
+}
+function select(list,i,curEl){
+  state.sel={list,i};text.querySelectorAll('.cur').forEach(n=>n.classList.remove('cur'));
+  const [vi,wi]=list[i];wEl(vi,wi)?.classList.add('cur');curEl&&curEl.classList.add('cur');
+  renderPanel();openPanel();
+}
+function openPanel(){panel.classList.add('open');
+  if(!matchMedia(WIDE).matches){document.body.classList.add('sheet');
+    const c=text.querySelector('.cur');if(c){const r=c.getBoundingClientRect();if(r.bottom>innerHeight*0.42||r.top<70)scrollBy({top:r.top-innerHeight*0.22,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}}}
+function closePanel(silent){panel.classList.remove('open');document.body.classList.remove('sheet');clearHL();state.sel=null;panel.innerHTML=emptyHTML}
+function act(t){
+  if(t.closest('.close')){closePanel();return}
+  const gb=t.closest('[data-go]');if(gb){step(+gb.dataset.go);return}
+  const tab=t.closest('[data-tab]');if(tab&&state.sel){state.sel.i=+tab.dataset.tab;const keep=text.querySelector('.e.cur');select(state.sel.list,state.sel.i,keep);return}
+  const we=t.closest('[data-w]'),ee=t.closest('[data-e]');
+  if(!we&&!ee)return;
+  clearHL();
+  if(we){const [vi,wi]=we.dataset.w.split('.').map(Number);const w=W(vi,wi);
+    const gs=new Set(w[3].map(p=>p[4]).filter(g=>g>=0));gs.forEach(hl);
+    const list=w[3].map((p,pi)=>[vi,wi,pi]);select(list,mainPart(w));}
+  else{const [vi,ti]=ee.dataset.e.split('.').map(Number);const tk=state.ch[vi][3][ti];if(tk[1]&2)return;
+    if(tk[2]<0){state.sel={sup:tk[0]};ee.classList.add('cur');renderPanel();openPanel();return}
+    hl(tk[2]);const list=(state.gp[tk[2]]||[]).slice();
+    if(!list.length){state.sel={sup:tk[0]};ee.classList.add('cur');renderPanel();openPanel();return}
+    select(list,0,ee);}
+}
+text.addEventListener('click',e=>act(e.target));panel.addEventListener('click',e=>act(e.target));
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-w],[data-e]')){e.preventDefault();act(e.target)}
+  if(e.key==='Escape'){if($('picker').classList.contains('open'))closePicker();else closePanel()}});
+$('prev').onclick=()=>step(-1);$('nextb').onclick=()=>step(1);
+const tg=$('tgEn');
+function applyOpts(){tg.setAttribute('aria-pressed',opts.en);document.body.classList.toggle('hide-en',!opts.en)}
+tg.onclick=()=>{opts.en=!opts.en;saveOpts();applyOpts()};applyOpts();
+// picker
+let pk={t:'ot',book:null};
+function openPicker(){pk={t:isOT(state.b)?'ot':'nt',book:null};drawPicker();$('picker').classList.add('open');document.body.style.overflow='hidden'}
+function closePicker(){$('picker').classList.remove('open');document.body.style.overflow=''}
+function drawPicker(){
+  let h=`<div class="pkhead"><h2>${pk.book?BOOKS[pk.book-1]:'성경 선택'}</h2>${pk.book?'<button class="pill" data-pk="back">책 목록</button>':''}<button class="close" style="position:static;display:block" data-pk="close" aria-label="닫기">×</button></div>`;
+  if(!pk.book){
+    h+=`<div class="seg"><button data-pk="ot" aria-pressed="${pk.t==='ot'}">구약 (히브리어)</button><button data-pk="nt" aria-pressed="${pk.t==='nt'}">신약 (헬라어)</button></div>`;
+    const r=pk.t==='ot'?[1,39]:[40,66];let g='';for(let b=r[0];b<=r[1];b++)g+=`<button data-bk="${b}" class="${b===state.b?'sel':''}">${BOOKS[b-1]}</button>`;
+    h+=`<div class="grid">${g}</div>`;
+  }else{let g='';for(let c=1;c<=CHAP[pk.book-1];c++)g+=`<button data-cp="${c}" class="${pk.book===state.b&&c===state.c?'sel':''}">${c}</button>`;h+=`<div class="grid ch">${g}</div>`}
+  h+=`<div class="opts">히브리어 강세 부호 <button class="toggle" data-pk="cant" aria-pressed="${opts.cant}">${opts.cant?'표시':'숨김'}</button></div>`;
+  h+=`<div class="opts off"><div class="offtxt"><b>인터넷 없이 보기</b><span id="offst">저장 상태를 확인하는 중…</span></div><button class="pill" data-pk="dl" id="dlbtn" hidden>성경 전체 저장 (약 15MB)</button>${installEvt?'<button class="pill" data-pk="install">앱으로 설치</button>':''}</div>`;
+  $('pk').innerHTML=h;offStatus();
+}
+// ----- 오프라인 저장 (서비스 워커가 data-v* 캐시에 보관)
+const DATA_CACHE='ob-data-v1';
+let dlBusy=false,installEvt=null;
+async function savedBooks(){
+  if(!('caches' in window))return null;
+  const c=await caches.open(DATA_CACHE);const keys=await c.keys();
+  const s=new Set(keys.map(k=>(k.url.match(/books\/(\d\d)\.json/)||[])[1]).filter(Boolean).map(Number));return s;
+}
+async function offStatus(msg){
+  const st=$('offst'),bt=$('dlbtn');if(!st)return;
+  if(!('serviceWorker' in navigator)||!('caches' in window)){st.textContent='이 브라우저에서는 오프라인 저장을 쓸 수 없습니다.';return}
+  if(msg){st.textContent=msg;return}
+  const s=await savedBooks();const n=s?s.size:0;
+  st.textContent=n>=66?'성경 66권이 모두 이 기기에 저장되어 있습니다.':`지금까지 읽은 책은 자동으로 저장됩니다 (${n}/66권). 전체를 한 번에 저장하려면 와이파이에서 눌러 주세요.`;
+  if(bt)bt.hidden=n>=66||dlBusy;
+}
+async function downloadAll(){
+  if(dlBusy)return;dlBusy=true;$('dlbtn')&&($('dlbtn').hidden=true);
+  try{if(navigator.storage?.persist)await navigator.storage.persist()}catch(e){}
+  const c=await caches.open(DATA_CACHE);const have=await savedBooks();let done=have.size,fail=0;
+  const todo=[];for(let b=1;b<=66;b++)if(!have.has(b))todo.push(b);
+  const one=async b=>{const u=new URL('data/'+bookFile(b),location.href).href;
+    try{const r=await fetch(u,{cache:'no-cache'});if(!r.ok)throw 0;await c.put(u,r);done++}catch(e){fail++}
+    offStatus(`저장하는 중… ${done}/66권`)};
+  while(todo.length)await Promise.all(todo.splice(0,4).map(one));
+  dlBusy=false;offStatus(fail?`${fail}권을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.`:undefined);
+  if(fail&&$('dlbtn'))$('dlbtn').hidden=false;
+}
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if($('picker').classList.contains('open'))drawPicker()});
+addEventListener('appinstalled',()=>{installEvt=null});
+if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+// 폴드를 접거나 펼쳐 화면 폭이 바뀌면 패널 배치를 다시 맞춤
+matchMedia(WIDE).addEventListener('change',e=>{if(e.matches)document.body.classList.remove('sheet');else if(state.sel)openPanel()});
+$('title').onclick=openPicker;
+$('pk').addEventListener('click',e=>{const t=e.target;
+  const a=t.closest('[data-pk]')?.dataset.pk;
+  if(a==='close')return closePicker();if(a==='back'){pk.book=null;return drawPicker()}
+  if(a==='ot'||a==='nt'){pk.t=a;return drawPicker()}
+  if(a==='dl')return downloadAll();
+  if(a==='install'&&installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;drawPicker()});return}
+  if(a==='cant'){opts.cant=!opts.cant;saveOpts();drawPicker();if(state.ch&&isOT(state.b)){closePanel();render()}return}
+  const bk=t.closest('[data-bk]');if(bk){const b=+bk.dataset.bk;if(CHAP[b-1]===1){closePicker();return go(b,1)}pk.book=b;return drawPicker()}
+  const cp=t.closest('[data-cp]');if(cp){closePicker();go(pk.book,+cp.dataset.cp)}});
+panel.innerHTML=emptyHTML;
+go(state.b,state.c);
+</script>
+</body>
+</html>
