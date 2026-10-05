@@ -44,3 +44,15 @@ python3 -m http.server 8765
 ```
 
 그다음 브라우저에서 http://localhost:8765 를 엽니다.
+
+## 70인경 (개인 자료, 공개하지 않음)
+
+랄프스판 70인경은 원자료(CCAT/CATSS) 약관상 공개 사이트에 올릴 수 없어서, 자료 파일을 따로 만들어 각 기기에서 불러옵니다.
+
+```bash
+python3 tools/build_lxx.py
+```
+
+- 원자료: `_원자료/lxx/` (github.com/eliranwong/LXX-Rahlfs-1935, STEPBible TVTMS)
+- 결과: `_개인자료/원어성경_70인경.json.gz` (`.gitignore`로 GitHub에서 제외)
+- 앱에서: 책 선택 화면 아래 **70인경 자료 불러오기** → 위 파일 선택. 앱의 이 기기 저장소(`lxx-private`)에만 들어갑니다.

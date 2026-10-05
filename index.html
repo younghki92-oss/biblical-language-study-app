@@ -77,7 +77,7 @@ aside{position:relative}
 }
 @media (min-width:680px){.grab,.close{display:none}.panel{padding:18px 18px 22px}.word{font-size:2.2rem}}
 @media (min-width:1000px){.panel{padding:22px 22px 26px}.word{font-size:2.6rem}}
-@media (max-width:479px){.bar{gap:2px;padding:8px 8px}.nav{width:34px;height:34px}.title{font-size:1.12rem;padding:4px 4px}.title::after{margin-left:6px}.toggle{padding:6px 9px;font-size:.78rem}}
+@media (max-width:479px){.bar{gap:2px;padding:8px 6px}.nav{width:32px;height:34px}.title{font-size:1.12rem;padding:4px 2px}.title::after{display:none}.toggle{padding:6px 7px;font-size:.76rem}}
 @media (prefers-reduced-motion:reduce){.panel,.picker{transition:none}.verse.flash{animation:none}}
 .close{position:absolute;top:14px;right:14px;border:none;background:var(--wash2);width:34px;height:34px;border-radius:50%;font-size:1.1rem;cursor:pointer}
 .empty{color:var(--muted);font-size:.95rem;line-height:1.7}
@@ -168,6 +168,7 @@ footer p{max-width:640px}
   <button class="title" id="title" aria-haspopup="dialog">원어 성경</button>
   <button class="nav" id="nextb" aria-label="다음 장">›</button>
   <div class="sp"></div>
+  <button class="toggle" id="tgLx" aria-pressed="false" aria-label="구약을 70인경으로 보기" title="70인경" hidden>LXX</button>
   <button class="toggle" id="tgEn" aria-pressed="true">영어</button>
   <button class="toggle" id="tgKo" aria-pressed="true">한국어</button>
   <button class="nav" id="sbtn" aria-label="검색 (구절·단어·문법)" title="검색"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg></button>
@@ -211,30 +212,63 @@ try{const s=JSON.parse(localStorage.getItem('ob-pos')||'null');if(s&&s.b&&s.c){s
 const $=id=>document.getElementById(id);
 const panel=$('panel'),text=$('text');
 const emptyHTML=`<div class="grab"></div><div class="empty"><b>단어를 눌러 보세요</b>원어 단어나 영어 단어를 누르면 서로 짝이 되는 단어가 함께 표시되고, 이곳에 발음, 어근, 문법, 사전 뜻풀이가 나타납니다.</div>`;
+// ----- 70인경(개인 자료): 공개 사이트에는 없고, 이 기기의 'lxx-private' 저장소에만 있음
+const LXX_CACHE='lxx-private';let LXXM=null;const lcache={};
+const lxxURL=n=>new URL('lxx/'+n,location.href).href;
+function loadL(name){
+  if(!lcache[name])lcache[name]=caches.open(LXX_CACHE).then(c=>c.match(lxxURL(name))).then(r=>{if(!r)throw new Error('no lxx');return r.json()})
+    .catch(e=>{delete lcache[name];throw e});
+  return lcache[name];
+}
+const lxxReady=('caches' in window?loadL('meta.json').then(m=>{LXXM=m;CAND=null;applyLxxBtn()}).catch(()=>{}):Promise.resolve());
+const corp=(b=state.b)=>!isOT(b)?'nt':(opts.lxx&&LXXM)?'lxx':'ot';
+function chaps(b){if(corp(b)==='lxx'&&LXXM.chaps[b])return LXXM.chaps[b];return Array.from({length:CHAP[b-1]},(_,i)=>i+1)}
+const erOf=(v,c)=>v[1]===0?[[c,parseInt(v[0])]]:v[1];  // 70인경 절 -> 영어·한국어 [장, 절] 목록
+function lxxFind(bk,c,v){  // 영어(히브리어 성경) 장·절 -> 70인경 [장, 절 순서]
+  for(const [lc,vs] of bk.c)for(let i=0;i<vs.length;i++)if(erOf(vs[i],lc).some(([x,y])=>x===c&&(!v||y===v)))return [lc,i];
+  return null}
+function engMap(bk){const m=new Map();
+  for(const [c,vs] of bk.c)for(const v of vs){const t=v[3].map(x=>x[0]+(x[1]&1?'':' ')).join('').trim();
+    for(const x of (Array.isArray(v[0])?v[0]:[v[0]])){const k=c+':'+x;m.set(k,m.has(k)?m.get(k)+' '+t:t)}}
+  return m}
+function applyLxxBtn(){const t=$('tgLx');if(!t)return;t.hidden=!(LXXM&&isOT(state.b));t.setAttribute('aria-pressed',!!(opts.lxx&&LXXM))}
 async function go(b,c,focus){
-  b=Math.max(1,Math.min(66,b));c=Math.max(1,Math.min(CHAP[b-1],c));
-  state.b=b;state.c=c;state.sel=null;closePanel(true);
+  b=Math.max(1,Math.min(66,b));
+  if(isOT(b)&&opts.lxx)await lxxReady;
+  const cp=corp(b),name=bookFile(b),kname='krv/'+name.slice(6);
+  let lbk=null;
+  if(cp==='lxx'){
+    try{lbk=await loadL('books/'+name.slice(6))}catch(e){LXXM=null;applyLxxBtn();return go(b,c,focus)}
+    // 영어 장·절로 들어온 경우(구절 찾기, 히브리어에서 바꾸기)는 70인경 장으로 옮김
+    if(focus&&focus.v!=null){const f=lxxFind(lbk,c,focus.v);if(f){c=f[0];focus=focus.v?{vi:f[1]}:null}else focus=null}
+    else if(focus&&focus.fromHeb){const f=lxxFind(lbk,c,0);if(f)c=f[0];focus=null}
+  }
+  const CL=chaps(b);if(!CL.includes(c))c=CL.reduce((a,x)=>Math.abs(x-c)<Math.abs(a-c)?x:a,CL[0]);
+  state.b=b;state.c=c;state.cp=cp;state.sel=null;closePanel(true);applyLxxBtn();
   try{localStorage.setItem('ob-pos',JSON.stringify({b,c}))}catch(e){}
-  $('title').innerHTML=`<span class="tl">${BOOKS[b-1]}</span><span class="ts">${BOOKS[b-1].length>4?KO_AB[b-1]:BOOKS[b-1]}</span> ${c}${b===19?'편':'장'}`;$('title').setAttribute('aria-label',`${BOOKS[b-1]} ${c}${b===19?'편':'장'}, 성경 선택`);document.title=`${BOOKS[b-1]} ${c} — 원어 성경`;
-  $('prev').disabled=(b===1&&c===1);$('nextb').disabled=(b===66&&c===CHAP[65]);
-  const name=bookFile(b),kname='krv/'+name.slice(6);
-  if(!state.loaded?.[name])text.innerHTML=`<div class="status">${BOOKS[b-1]} 본문을 불러오는 중입니다…</div>`;
-  lexFor(b);
-  let bk;
+  const unit=b===19?'편':'장',lx=cp==='lxx'?' (70인경)':'';
+  $('title').innerHTML=`<span class="tl">${BOOKS[b-1]}</span><span class="ts">${BOOKS[b-1].length>4?KO_AB[b-1]:BOOKS[b-1]}</span> ${c}${unit}`;$('title').setAttribute('aria-label',`${BOOKS[b-1]} ${c}${unit}${lx}, 성경 선택`);document.title=`${BOOKS[b-1]} ${c}${lx} — 원어 성경`;
+  $('prev').disabled=isFirst();$('nextb').disabled=isLast();
+  const key=cp+name;
+  if(!state.loaded?.[key])text.innerHTML=`<div class="status">${BOOKS[b-1]}${lx} 본문을 불러오는 중입니다…</div>`;
+  lexFor(cp==='lxx'?40:b);
   const kp=opts.ko?load(kname).catch(()=>null):Promise.resolve(null);
-  try{[bk]=await Promise.all([load(name),PT.length?0:loadPT()]);(state.loaded??={})[name]=1}catch(e){
+  const ep=cp==='lxx'?load(name).then(engMap).catch(()=>null):Promise.resolve(null);
+  let bk;
+  try{[bk]=await Promise.all([lbk||load(name),PT.length?0:loadPT()]);(state.loaded??={})[key]=1}catch(e){
     text.innerHTML=`<div class="status">본문을 불러오지 못했습니다. 이 책을 아직 기기에 저장하지 않았다면 인터넷 연결을 확인한 뒤 다시 시도해 주세요.<br><button class="pill" id="retry">다시 시도</button></div>`;
     $('retry').onclick=()=>go(b,c);return}
-  if(state.b!==b||state.c!==c)return;
-  const ko=await kp;if(state.b!==b||state.c!==c)return;
+  const [ko,eng]=await Promise.all([kp,ep]);if(state.b!==b||state.c!==c||state.cp!==cp)return;
   const ch=bk.c.find(x=>x[0]===c);
-  state.ch=ch?ch[1]:[];state.ko=ko;render();
+  state.ch=ch?ch[1]:[];state.ko=ko;state.eng=eng;render();
   if(focus)focusOn(focus);else window.scrollTo(0,0);
 }
+const isFirst=()=>state.b===1&&state.c===chaps(1)[0];
+const isLast=()=>state.b===66&&state.c===CHAP[65];
 // 특정 절(focus.v = 절 번호) 또는 단어(focus.vi, wi, pi)로 이동
 function focusOn(f){
   let vi=f.vi;
-  if(vi==null)vi=state.ch.findIndex(x=>(Array.isArray(x[0])?x[0]:[x[0]]).includes(f.v));
+  if(vi==null){if(!f.v){window.scrollTo(0,0);return}vi=state.ch.findIndex(x=>(Array.isArray(x[0])?x[0]:[x[0]]).includes(f.v))}
   const sec=text.querySelectorAll('section.verse')[vi];
   if(!sec){window.scrollTo(0,0);return}
   sec.scrollIntoView({block:f.wi!=null&&!matchMedia(WIDE).matches?'start':'center'});
@@ -246,7 +280,9 @@ function koFor(vn){
   const t=(Array.isArray(vn)?vn:[vn]).map(v=>C[String(v)]).filter(x=>x&&x!=='(없음)').join(' ');
   return t?`<div class="ko" lang="ko">${esc(t)}</div>`:'';
 }
+const nextHTML=()=>`<div class="next"><button class="pill" data-go="-1"${isFirst()?' hidden':''}>‹ 이전 장</button><button class="pill" data-go="1"${isLast()?' hidden':''}>다음 장 ›</button></div>`;
 function render(){
+  if(state.cp==='lxx')return renderLXX();
   const ot=isOT(state.b);const V=state.ch;const gp={},ge={};
   let h='';
   V.forEach((v,vi)=>{
@@ -259,11 +295,24 @@ function render(){
     const lab=(Array.isArray(vn)?vn:[vn]).map(x=>x===0?'표제':x).join(', ');
     h+=`<section class="verse"><div class="vn">${lab}${hl?`<small>히 ${hl}</small>`:''}</div><div><div class="gk${ot?' he':''}" lang="${ot?'he':'grc'}">${gk}</div><div class="en" lang="en">${en}</div>${koFor(vn)}</div></section>`;
   });
-  const b=state.b,c=state.c;
-  h+=`<div class="next"><button class="pill" data-go="-1"${b===1&&c===1?' hidden':''}>‹ 이전 장</button><button class="pill" data-go="1"${b===66&&c===CHAP[65]?' hidden':''}>다음 장 ›</button></div>`;
-  text.innerHTML=h;state.gp=gp;state.ge=ge;
+  text.innerHTML=h+nextHTML();state.gp=gp;state.ge=ge;
 }
-function step(dir){let b=state.b,c=state.c+dir;if(c<1){b--;if(b<1)return;c=CHAP[b-1]}else if(c>CHAP[b-1]){b++;if(b>66)return;c=1}go(b,c)}
+// 70인경: 원어는 단어별로 누를 수 있고, 영어·한국어는 대응하는 절을 통째로 보여 줌
+function renderLXX(){
+  const V=state.ch,c=state.c,K=opts.ko&&state.ko?state.ko:null;let h='';
+  V.forEach((v,vi)=>{const [lab,,words]=v;const er=erOf(v,c);
+    const gk=words.map((w,wi)=>`<span class="w" data-w="${vi}.${wi}" tabindex="0">${esc(w[0])}</span> `).join('');
+    const en=state.eng?er.map(([x,y])=>state.eng.get(x+':'+y)).filter(Boolean).join(' '):'';
+    const ko=K?er.map(([x,y])=>(K[String(x)]||{})[String(y)]).filter(t=>t&&t!=='(없음)').join(' '):'';
+    const same=er.length===1&&er[0][0]===c&&String(er[0][1])===lab;
+    const sm=!er.length?'<small>70인경에만</small>':same?'':`<small>영·한 ${er.map(([x,y])=>(x===c?'':x+':')+(y===0?'표제':y)).join(', ')}</small>`;
+    h+=`<section class="verse"><div class="vn">${esc(lab==='0'?'서언':lab)}${sm}</div><div><div class="gk" lang="grc">${gk}</div>${en?`<div class="en" lang="en">${esc(en)}</div>`:''}${ko?`<div class="ko" lang="ko">${esc(ko)}</div>`:''}</div></section>`});
+  text.innerHTML=h+nextHTML();state.gp={};state.ge={};
+}
+function step(dir){const b=state.b,CL=chaps(b),i=CL.indexOf(state.c)+dir;
+  if(i<0){if(b<=1)return;const L=chaps(b-1);return go(b-1,L[L.length-1])}
+  if(i>=CL.length){if(b>=66)return;return go(b+1,chaps(b+1)[0])}
+  go(b,CL[i])}
 const W=(vi,wi)=>state.ch[vi][2][wi];
 const wEl=(vi,wi)=>text.querySelector(`[data-w="${vi}.${wi}"]`);
 const eEl=(vi,ti)=>text.querySelector(`[data-e="${vi}.${ti}"]`);
@@ -274,22 +323,25 @@ function mainPart(w){let best=0,bl=-1;w[3].forEach((p,i)=>{const s=(p[1].startsW
 function renderPanel(){
   const s=state.sel;if(!s)return;
   if(s.sup){panel.innerHTML=`<div class="grab"></div><button class="close" aria-label="닫기">×</button><div class="word">${esc(s.sup)}</div><div class="empty" style="margin-top:12px">이 영어 단어에는 연결된 원어 단어가 없습니다. 번역자가 문장을 자연스럽게 하려고 보충한 말이거나, 시편 표제처럼 연결 자료가 없는 부분입니다.</div>`;return}
-  const ot=isOT(state.b);const [vi,wi,pi]=s.list[s.i];const w=W(vi,wi);const p=w[3][pi];
-  const LX=LEX[ot?'hlx':'glx'];const lx=LX?LX[p[1]]:null;
+  const cp=state.cp||(isOT(state.b)?'ot':'nt'),ot=cp==='ot',lxm=cp==='lxx';const [vi,wi,pi]=s.list[s.i];const w=W(vi,wi);const p=w[3][pi];
+  const LX=lxm?LXXM?.lex:LEX[ot?'hlx':'glx'];let lx=LX?LX[p[1]]:null;
+  let defSrc=ot?'STEPBible 히브리어 사전 (BDB 요약)':'Abbott-Smith 신약 헬라어 사전 (STEPBible)',sn=p[1];
+  // 70인경 낱말: [기본형, 음역, 뜻, 신약 사전 번호] -> 신약에도 나오는 낱말이면 신약 사전 뜻풀이를 함께 보여 줌
+  if(lxm&&lx){const g=lx[3]&&LEX.glx?LEX.glx[lx[3]]:null;sn=lx[3]||'';lx=[lx[0],lx[1],lx[2],g?g[3]:''];defSrc='Abbott-Smith 신약 헬라어 사전 (STEPBible) · 신약에 같은 낱말이 있어 함께 보여 줍니다'}
   const H=ot?' h':'';
   let tabs='';
   if(s.list.length>1)tabs=`<div class="tabs">${s.list.map((x,i)=>`<button class="${ot?'h':''}" data-tab="${i}" aria-pressed="${i===s.i}">${esc(ot?heb(W(x[0],x[1])[3][x[2]][0]):W(x[0],x[1])[3][x[2]][0])}</button>`).join('')}</div>`;
   const big=ot?heb(w[0]).replace(/[׃־]/g,''):w[0].replace(/[,.;·]/g,'');
   const tr=ot?fmtTr(w[2],true):esc(w[2]);
   const ctx=p[4]>=0&&engFor(p[4])?`<div class="ctx">이 구절의 번역: <em>${esc(engFor(p[4]))}</em></div>`:(p[3]?`<div class="ctx">직역: <em>${esc(p[3])}</em></div>`:'');
-  const rows=p[2]>=0?PT[p[2]]:[];
+  const rows=p[2]>=0?((lxm?LXXM.pt:PT)[p[2]]||[]):[];
   const tbl=rows.length?`<h3>문법 파싱</h3><table>${rows.map(r=>`<tr><td>${r[0]}</td><td>${esc(r[1])}${r[2]?`<small>${esc(r[2])}</small>`:''}</td></tr>`).join('')}</table>`:'';
   const partNote=w[3].length>1&&ot?`<div class="src" style="margin-top:2px">이 단어는 ${w[3].length}개 부분으로 이루어져 있습니다. 아래 버튼으로 각 부분을 볼 수 있어요.</div>`:'';
   let root='';
-  if(lx){const t=ot?'ot':'nt',ix=IDXR[t],n=ix?ix.cnt[ix.lid.get(p[1])]:0;if(!ix)loadIdx(t).then(()=>{if(state.sel)renderPanel()}).catch(()=>{});
-    root=`<h3>어근 (사전 기본형)</h3><div class="root"><span class="l${H}">${esc(lx[0])}</span><span class="lt">${ot?fmtTr(lx[1],true):esc(lx[1])}</span><span class="sn">${esc(p[1])}</span></div><div class="gl">기본 뜻: ${esc(lx[2])}</div><button class="pill" style="margin-top:12px" data-conc="${esc(p[1])}">이 단어가 나오는 곳 보기${n?` · ${n.toLocaleString()}회`:''}</button>`}
+  if(lx){const t=cp,ix=IDXR[t],n=ix?ix.cnt[ix.lid.get(p[1])]:0;if(!ix)loadIdx(t).then(()=>{if(state.sel)renderPanel()}).catch(()=>{});
+    root=`<h3>어근 (사전 기본형)</h3><div class="root"><span class="l${H}">${esc(lx[0])}</span><span class="lt">${ot?fmtTr(lx[1],true):esc(lx[1])}</span>${sn?`<span class="sn">${esc(sn)}</span>`:''}</div><div class="gl">기본 뜻: ${esc(lx[2])}</div><button class="pill" style="margin-top:12px" data-conc="${esc(p[1])}">이 단어가 나오는 곳 보기${n?` · ${n.toLocaleString()}회`:''}</button>`}
   else if(!LX)root=`<h3>어근 (사전 기본형)</h3><div class="empty">사전을 불러오는 중입니다…</div>`;
-  const def=lx&&lx[3]?`<h3>사전 뜻풀이</h3><div class="def clip" id="def">${lx[3]}</div><button class="more" id="more">전체 보기</button><div class="src">${ot?'STEPBible 히브리어 사전 (BDB 요약)':'Abbott-Smith 신약 헬라어 사전 (STEPBible)'}</div>`:'';
+  const def=lx&&lx[3]?`<h3>사전 뜻풀이</h3><div class="def clip" id="def">${lx[3]}</div><button class="more" id="more">전체 보기</button><div class="src">${defSrc}</div>`:(lxm&&lx?`<div class="src" style="margin-top:14px">신약에 나오지 않는 낱말이라 짧은 뜻만 있습니다.</div>`:'');
   const curPart=w[3].length>1?`<h3>선택한 부분</h3><div class="root"><span class="l${H}">${esc(ot?heb(p[0]):p[0])}</span></div>`:'';
   panel.innerHTML=`<div class="grab"></div><button class="close" aria-label="닫기">×</button><div class="word${H}" lang="${ot?'he':'grc'}">${esc(big)}</div><div class="tr">${tr}</div>${partNote}${tabs}${curPart}${ctx}${root}${tbl}${def}`;
   panel.scrollTop=0;
@@ -307,7 +359,7 @@ function openPanel(){panel.classList.add('open');
 function closePanel(silent){panel.classList.remove('open');document.body.classList.remove('sheet');clearHL();state.sel=null;panel.innerHTML=emptyHTML}
 function act(t){
   if(t.closest('.close')){closePanel();return}
-  const cc=t.closest('[data-conc]');if(cc){openConc(isOT(state.b)?'ot':'nt',cc.dataset.conc);return}
+  const cc=t.closest('[data-conc]');if(cc){openConc(state.cp||(isOT(state.b)?'ot':'nt'),cc.dataset.conc);return}
   const gb=t.closest('[data-go]');if(gb){step(+gb.dataset.go);return}
   const tab=t.closest('[data-tab]');if(tab&&state.sel){state.sel.i=+tab.dataset.tab;const keep=text.querySelector('.e.cur');select(state.sel.list,state.sel.i,keep);return}
   const we=t.closest('[data-w]'),ee=t.closest('[data-e]');
@@ -334,6 +386,10 @@ tk.onclick=async()=>{opts.ko=!opts.ko;saveOpts();applyOpts();if(!state.ch)return
   if(opts.ko&&!state.ko){try{state.ko=await load('krv/'+bookFile(state.b).slice(6))}catch(e){}}
   const y=scrollY,sel=state.sel;closePanel();render();scrollTo(0,y)};
 applyOpts();
+$('tgLx').onclick=()=>{const b=state.b;
+  if(opts.lxx){// 70인경 -> 히브리어: 지금 장의 절이 해당하는 영어 장으로
+    const v=state.ch&&state.ch.find(x=>erOf(x,state.c).length);opts.lxx=false;saveOpts();go(b,v?erOf(v,state.c)[0][0]:state.c)}
+  else{opts.lxx=true;saveOpts();go(b,state.c,{fromHeb:true})}};
 // picker
 let pk={t:'ot',book:null};
 function openPicker(){pk={t:isOT(state.b)?'ot':'nt',book:null};drawPicker();$('picker').classList.add('open');document.body.style.overflow='hidden'}
@@ -344,10 +400,11 @@ function drawPicker(){
     h+=`<div class="seg"><button data-pk="ot" aria-pressed="${pk.t==='ot'}">구약 (히브리어)</button><button data-pk="nt" aria-pressed="${pk.t==='nt'}">신약 (헬라어)</button></div>`;
     const r=pk.t==='ot'?[1,39]:[40,66];let g='';for(let b=r[0];b<=r[1];b++)g+=`<button data-bk="${b}" class="${b===state.b?'sel':''}">${BOOKS[b-1]}</button>`;
     h+=`<div class="grid">${g}</div>`;
-  }else{let g='';for(let c=1;c<=CHAP[pk.book-1];c++)g+=`<button data-cp="${c}" class="${pk.book===state.b&&c===state.c?'sel':''}">${c}</button>`;h+=`<div class="grid ch">${g}</div>`}
+  }else{let g='';for(const c of chaps(pk.book))g+=`<button data-cp="${c}" class="${pk.book===state.b&&c===state.c?'sel':''}">${c}</button>`;h+=`<div class="grid ch">${g}</div>`}
   h+=`<div class="opts">글자 크기 <span class="fsz"><button class="toggle" data-pk="fs-" aria-label="글자 작게">가−</button><span>${Math.round(opts.fs*100)}%</span><button class="toggle" data-pk="fs+" aria-label="글자 크게">가+</button></span>
     <span style="width:12px"></span>히브리어 강세 부호 <button class="toggle" data-pk="cant" aria-pressed="${opts.cant}">${opts.cant?'표시':'숨김'}</button></div>`;
   h+=`<div class="opts off"><div class="offtxt"><b>인터넷 없이 보기</b><span id="offst">저장 상태를 확인하는 중…</span></div><button class="pill" data-pk="dl" id="dlbtn" hidden>전체 저장 (약 20MB)</button>${installEvt?'<button class="pill" data-pk="install">앱으로 설치</button>':''}</div>`;
+  if('caches' in window)h+=`<div class="opts off"><div class="offtxt"><b>70인경 (랄프스판 · 이 기기 전용)</b><span id="lxst">${LXXM?'이 기기에 저장되어 있습니다. 구약을 볼 때 위쪽 <b style="display:inline">LXX</b> 단추로 히브리어와 70인경을 바꿀 수 있습니다.':'자료 파일(원어성경_70인경.json.gz)을 불러오면 구약을 70인경으로도 볼 수 있습니다.'}</span>${LXXM?`<span style="display:block;font-size:.75rem;margin-top:6px">${esc(LXXM.credit||'')}</span>`:''}</div><button class="pill" data-pk="lxin">${LXXM?'다시 불러오기':'70인경 자료 불러오기'}</button>${LXXM?'<button class="pill" data-pk="lxdel">지우기</button>':''}<input type="file" id="lxfile" hidden></div>`;
   $('pk').innerHTML=h;offStatus();
 }
 // ----- 오프라인 저장 (서비스 워커가 data-v* 캐시에 보관)
@@ -384,6 +441,27 @@ async function downloadAll(){
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if($('picker').classList.contains('open'))drawPicker()});
 addEventListener('appinstalled',()=>{installEvt=null});
 if('serviceWorker' in navigator&&location.protocol!=='file:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+// ----- 70인경 자료 파일 불러오기: 책별로 나눠 이 기기의 저장소에 넣음
+function resetLXX(){for(const k in lcache)delete lcache[k];delete IDX.lxx;delete IDXR.lxx;CAND=null;applyLxxBtn()}
+async function importLXX(file){
+  const st=m=>{const e=$('lxst');if(e)e.textContent=m};
+  try{st('파일을 읽는 중…');
+    const u=new Uint8Array(await file.arrayBuffer());let txt;
+    if(u[0]===0x1f&&u[1]===0x8b)txt=await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    else txt=new TextDecoder().decode(u);
+    const d=JSON.parse(txt);if(d.kind!=='ob-lxx')throw new Error('kind');
+    st('저장하는 중…');
+    try{if(navigator.storage?.persist)await navigator.storage.persist()}catch(e){}
+    await caches.delete(LXX_CACHE);const c=await caches.open(LXX_CACHE);
+    const put=(n,o)=>c.put(lxxURL(n),new Response(JSON.stringify(o),{headers:{'Content-Type':'application/json'}}));
+    const chapsOf={};for(const b in d.books){chapsOf[b]=d.books[b].c.map(x=>x[0]);await put('books/'+String(b).padStart(2,'0')+'.json',d.books[b])}
+    await put('search.json',d.idx);
+    const meta={ver:d.ver,credit:d.credit||d.name||'',pt:d.pt,lex:d.lex,chaps:chapsOf};await put('meta.json',meta);
+    LXXM=meta;resetLXX();drawPicker();
+    const e=$('lxst');if(e)e.textContent='70인경 자료를 저장했습니다. 구약을 볼 때 위쪽 LXX 단추를 눌러 보세요.';
+  }catch(e){st('이 파일은 70인경 자료 파일이 아니거나 읽을 수 없습니다. 원어성경_70인경.json.gz 파일을 골라 주세요.')}
+}
+$('pk').addEventListener('change',e=>{if(e.target.id==='lxfile'&&e.target.files[0])importLXX(e.target.files[0])});
 // 폴드를 접거나 펼쳐 화면 폭이 바뀌면 패널 배치를 다시 맞춤
 matchMedia(WIDE).addEventListener('change',e=>{if(e.matches)document.body.classList.remove('sheet');else if(state.sel)openPanel()});
 $('title').onclick=openPicker;$('sbtn').onclick=()=>openSearch();
@@ -392,15 +470,18 @@ $('pk').addEventListener('click',e=>{const t=e.target;
   if(a==='close')return closePicker();if(a==='back'){pk.book=null;return drawPicker()}
   if(a==='ot'||a==='nt'){pk.t=a;return drawPicker()}
   if(a==='dl')return downloadAll();
+  if(a==='lxin')return $('lxfile').click();
+  if(a==='lxdel'){if(!confirm('이 기기에서 70인경 자료를 지울까요? 자료 파일이 있으면 언제든 다시 불러올 수 있습니다.'))return;
+    caches.delete(LXX_CACHE).then(()=>{LXXM=null;resetLXX();drawPicker();if(isOT(state.b)&&state.cp==='lxx')go(state.b,state.c)});return}
   if(a==='fs-'||a==='fs+'){opts.fs=Math.round(Math.min(1.5,Math.max(0.8,opts.fs+(a==='fs+'?0.1:-0.1)))*10)/10;saveOpts();applyOpts();return drawPicker()}
   if(a==='install'&&installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;drawPicker()});return}
   if(a==='cant'){opts.cant=!opts.cant;saveOpts();drawPicker();if(state.ch&&isOT(state.b)){closePanel();render()}return}
-  const bk=t.closest('[data-bk]');if(bk){const b=+bk.dataset.bk;if(CHAP[b-1]===1){closePicker();return go(b,1)}pk.book=b;return drawPicker()}
+  const bk=t.closest('[data-bk]');if(bk){const b=+bk.dataset.bk;if(chaps(b).length===1){closePicker();return go(b,chaps(b)[0])}pk.book=b;return drawPicker()}
   const cp=t.closest('[data-cp]');if(cp){closePicker();go(pk.book,+cp.dataset.cp)}});
 // ===== 검색: 구절 바로 가기, 단어 용례, 문법 검색 =====
 const IDX={},IDXR={};
 function loadIdx(t){
-  if(!IDX[t])IDX[t]=load('search/'+t+'.json').then(d=>{
+  if(!IDX[t])IDX[t]=(t==='lxx'?loadL('search.json'):load('search/'+t+'.json')).then(d=>{
     const l=Int32Array.from(d.l),m=Int32Array.from(d.m),w=Int32Array.from(d.w);
     const cnt=new Int32Array(d.lem.length),pc=new Map();
     for(let i=0;i<l.length;i++){if(l[i]>=0)cnt[l[i]]++;pc.set(m[i],(pc.get(m[i])||0)+1)}
@@ -439,10 +520,13 @@ function parseRef(q){
 const normG=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/ς/g,'σ');
 const normH=s=>s.replace(/[֑-ׇ]/g,'').replace(/[ךםןףץ]/g,c=>({'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ'}[c]));
 const normL=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'');
+const ptOf=t=>t==='lxx'?(LXXM?LXXM.pt:[]):PT;
+const lexOf=(t,k)=>t==='lxx'?LXXM?.lex[k]:LEX[t==='ot'?'hlx':'glx']?.[k];
+const corpName=t=>t==='ot'?'구약':t==='lxx'?'70인경':'신약';
 let CAND=null;
 function candList(){
   if(CAND||!LEX.glx||!LEX.hlx)return CAND;
-  CAND=[];for(const [t,lx] of [['nt',LEX.glx],['ot',LEX.hlx]])for(const k in lx){const e=lx[k];
+  CAND=[];for(const [t,lx] of [['nt',LEX.glx],['ot',LEX.hlx],['lxx',LXXM?LXXM.lex:{}]])for(const k in lx){const e=lx[k];
     CAND.push({t,k,lem:e[0],tr:e[1],gl:e[2],nl:t==='ot'?normH(e[0]):normG(e[0]),nt:normL(e[1]),ng:' '+normL(e[2]).replace(/\s+/g,' ')+' '})}
   return CAND;
 }
@@ -452,9 +536,9 @@ function findCands(q,only){
   let sc;
   const sm=q.match(/^([GHgh])?\s*0*(\d{1,4})([a-zA-Z])?$/);
   if(sm){const pre=(sm[1]||'').toUpperCase(),num=sm[2].padStart(4,'0'),suf=(sm[3]||'').toUpperCase();
-    sc=c=>c.k.slice(1,5)===num&&(!pre||c.k[0]===pre)&&(!suf||c.k.slice(5)===suf)?3:0}
+    sc=c=>{const k=c.t==='lxx'?(LXXM.lex[c.k][3]||''):c.k;return k&&k.slice(1,5)===num&&(!pre||k[0]===pre)&&(!suf||k.slice(5)===suf)?3:0}}
   else if(/[֐-׿]/.test(q)){const n=normH(q);sc=c=>c.t!=='ot'?0:c.nl===n?3:c.nl.startsWith(n)?2:0}
-  else if(/[Ͱ-Ͽἀ-῿]/.test(q)){const n=normG(q);sc=c=>c.t!=='nt'?0:c.nl===n?3:c.nl.startsWith(n)?2:0}
+  else if(/[Ͱ-Ͽἀ-῿]/.test(q)){const n=normG(q);sc=c=>c.t==='ot'?0:c.nl===n?3:c.nl.startsWith(n)?2:0}
   else if(/[가-힣]/.test(q))return[];
   else{const n=normL(q);if(!n)return[];const nn=n.replace(/ /g,'');
     sc=c=>c.nt===nn?3:c.ng.includes(' '+n+' ')?2.5:c.nt.startsWith(nn)?2:c.ng.includes(' '+n)?1:0}
@@ -468,7 +552,7 @@ const sk=$('sk');
 function openSearch(){S.view='home';drawSearch();$('search').classList.add('open');document.body.style.overflow='hidden';
   lexFor(1);lexFor(40);
   Promise.all([load('glx.json'),load('hlx.json')]).then(([g,h])=>{LEX.glx=g;LEX.hlx=h;if(S.view==='home')drawHomeBody()}).catch(()=>{});
-  loadIdx('nt').then(()=>loadIdx('ot')).then(()=>{if(S.view==='home')drawHomeBody()}).catch(()=>{});
+  loadIdx('nt').then(()=>loadIdx('ot')).then(()=>LXXM?loadIdx('lxx'):0).then(()=>{if(S.view==='home')drawHomeBody()}).catch(()=>{});
   setTimeout(()=>$('sq')?.focus(),50)}
 function closeSearch(){$('search').classList.remove('open');document.body.style.overflow=''}
 const shead=(title,back)=>`<div class="pkhead">${back?'<button class="nav" data-s="back" aria-label="검색으로 돌아가기">‹</button>':''}<h2>${title}</h2><button class="close" style="position:static;display:block" data-s="close" aria-label="닫기">×</button></div>`;
@@ -490,32 +574,32 @@ function drawHomeBody(){
     if(cs===null)h+=`<div class="hint">사전을 불러오는 중입니다…</div>`;
     else if(!cs.length&&!r)h+=`<div class="hint">찾는 단어가 없습니다.</div>`;
     else h+=cs.map(c=>{const ix=IDXR[c.t],n=ix?ix.cnt[ix.lid.get(c.k)]:null;
-      return `<button class="cand" data-cand="${c.t}|${esc(c.k)}"><span class="l${c.t==='ot'?' h':''}">${esc(c.lem)}</span><span class="lt">${c.t==='ot'?fmtTr(c.tr,true):esc(c.tr)}</span><span class="g">${esc(c.gl)}</span><span class="tag">${c.t==='ot'?'구약':'신약'} ${esc(c.k)}</span>${n?`<span class="n">${n.toLocaleString()}회</span>`:''}</button>`}).join('')}
+      return `<button class="cand" data-cand="${c.t}|${esc(c.k)}"><span class="l${c.t==='ot'?' h':''}">${esc(c.lem)}</span><span class="lt">${c.t==='ot'?fmtTr(c.tr,true):esc(c.tr)}</span><span class="g">${esc(c.gl)}</span><span class="tag">${corpName(c.t)} ${esc(c.t==='lxx'?(LXXM.lex[c.k][3]||''):c.k)}</span>${n?`<span class="n">${n.toLocaleString()}회</span>`:''}</button>`}).join('')}
   el.innerHTML=h;
 }
 // --- 문법 검색 화면
 const GORDER=['어간','형태','시제','태','법','격','인칭','성','수','상태','급','언어'];
 const rv=(rows,lab)=>{const r=rows&&rows.find(x=>x[0]===lab);return r?r[1]:''};
 function gramFields(ix,pos){
-  const F={};for(const [pi,n] of ix.pc){const rows=PT[pi];if(!rows)continue;if(pos&&rv(rows,'품사')!==pos)continue;
+  const F={},P_=ptOf(S.g.t);for(const [pi,n] of ix.pc){const rows=P_[pi];if(!rows)continue;if(pos&&rv(rows,'품사')!==pos)continue;
     for(const r of rows){if(r[0]==='품사')continue;((F[r[0]]??={})[r[1]]??={n:0,en:r[2]}).n+=n}}
   return F;
 }
 function drawGram(el){
   const g=S.g,ix=IDXR[g.t];
-  let h=`<div class="seg"><button data-gt="ot" aria-pressed="${g.t==='ot'}">구약 (히브리어)</button><button data-gt="nt" aria-pressed="${g.t==='nt'}">신약 (헬라어)</button></div>`;
+  let h=`<div class="seg"><button data-gt="ot" aria-pressed="${g.t==='ot'}">구약 (히브리어)</button>${LXXM?`<button data-gt="lxx" aria-pressed="${g.t==='lxx'}">70인경</button>`:''}<button data-gt="nt" aria-pressed="${g.t==='nt'}">신약 (헬라어)</button></div>`;
   if(!ix||!PT.length){el.innerHTML=h+'<div class="hint">검색 자료를 불러오는 중입니다…</div>';
     Promise.all([loadIdx(g.t),PT.length?0:loadPT()]).then(()=>{if(S.view==='home'&&S.tab==='gram')drawHomeBody()}).catch(()=>{el.innerHTML=h+'<div class="hint">검색 자료를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.</div>'});return}
-  const P={};for(const [pi,n] of ix.pc){const p=rv(PT[pi],'품사');if(p)P[p]=(P[p]||0)+n}
+  const P={},P_=ptOf(g.t);for(const [pi,n] of ix.pc){const p=rv(P_[pi],'품사');if(p)P[p]=(P[p]||0)+n}
   const opt=(v,lab,sel)=>`<option value="${esc(v)}"${v===sel?' selected':''}>${esc(lab)}</option>`;
   h+=`<div class="gform"><label>품사<select data-gp="pos">${opt('','모든 품사',g.pos)}${Object.entries(P).sort((a,b)=>b[1]-a[1]).map(([p,n])=>opt(p,`${p} (${n.toLocaleString()})`,g.pos)).join('')}</select></label>`;
   const F=gramFields(ix,g.pos);
   for(const lab of GORDER.filter(l=>F[l])){
     h+=`<label>${lab}<select data-gf="${lab}">${opt('','전체',g.f[lab]||'')}${Object.entries(F[lab]).sort((a,b)=>b[1].n-a[1].n).map(([v,o])=>opt(v,`${v}${o.en?' '+o.en:''} (${o.n.toLocaleString()})`,g.f[lab]||'')).join('')}</select></label>`}
-  h+=`</div><label class="hint" style="display:block">책 범위<select class="bksel" data-gp="book">${opt('0',(g.t==='ot'?'구약':'신약')+' 전체',String(g.book))}${BOOKS.map((n,i)=>i+1).filter(b=>g.t==='ot'?b<=39:b>=40).map(b=>opt(String(b),BOOKS[b-1],String(g.book))).join('')}</select></label>`;
+  h+=`</div><label class="hint" style="display:block">책 범위<select class="bksel" data-gp="book">${opt('0',corpName(g.t)+' 전체',String(g.book))}${BOOKS.map((n,i)=>i+1).filter(b=>g.t==='nt'?b>=40:b<=39).map(b=>opt(String(b),BOOKS[b-1],String(g.book))).join('')}</select></label>`;
   h+=`<div class="sec">특정 단어(어근)로 좁히기 (선택)</div>`;
-  if(g.lem){const lx=LEX[g.t==='ot'?'hlx':'glx']?.[g.lem];h+=`<div class="chips"><button class="chip sel" data-glem=""><bdi>${esc(lx?lx[0]:g.lem)}</bdi> <b>${esc(g.lem)}</b> ×</button></div>`}
-  else h+=`<input class="sq" id="glq" type="search" autocomplete="off" placeholder="예: ${g.t==='ot'?'ברא, H1254, create':'λέγω, G3004, say'}" style="margin-bottom:6px"><div class="chips" id="glc"></div>`;
+  if(g.lem){const lx=lexOf(g.t,g.lem);h+=`<div class="chips"><button class="chip sel" data-glem=""><bdi>${esc(lx?lx[0]:g.lem)}</bdi> <b>${esc(g.lem)}</b> ×</button></div>`}
+  else h+=`<input class="sq" id="glq" type="search" autocomplete="off" placeholder="예: ${g.t==='ot'?'ברא, H1254, create':g.t==='lxx'?'κτίζω, create':'λέγω, G3004, say'}" style="margin-bottom:6px"><div class="chips" id="glc"></div>`;
   h+=`<button class="pill run" data-s="run">찾기</button><div class="hint" style="margin-top:14px">예: 신약 · 동사 · 시제 부정과거 · 법 명령법 → 부정과거 명령형이 쓰인 곳을 모두 찾습니다.</div>`;
   el.innerHTML=h;
 }
@@ -527,18 +611,19 @@ function gramCands(){
 // --- 검색 실행
 async function openConc(t,key){
   $('search').classList.add('open');document.body.style.overflow='hidden';S.view='res';S.res={loading:true};drawRes();
-  try{await Promise.all([loadIdx(t),load(t==='ot'?'hlx.json':'glx.json').then(d=>{LEX[t==='ot'?'hlx':'glx']=d})])}catch(e){S.res={err:1};return drawRes()}
+  try{await Promise.all([loadIdx(t),t==='lxx'?0:load(t==='ot'?'hlx.json':'glx.json').then(d=>{LEX[t==='ot'?'hlx':'glx']=d})])}catch(e){S.res={err:1};return drawRes()}
   const ix=IDXR[t],li=ix.lid.get(key);
   S.res={kind:'lem',t,key,li,hits:li==null?[]:scan(ix,i=>ix.l[i]===li),book:0,shown:40};drawRes();
 }
 async function runGram(){
-  const g=S.g,ix=IDXR[g.t];if(!ix)return;
-  const ok=new Uint8Array(PT.length);const conds=Object.entries(g.f).filter(([,v])=>v);
-  for(const pi of ix.pc.keys()){const rows=PT[pi];if(!rows)continue;if(g.pos&&rv(rows,'품사')!==g.pos)continue;
+  const g=S.g;try{await Promise.all([loadIdx(g.t),PT.length?0:loadPT()])}catch(e){S.view='res';S.res={err:1};return drawRes()}
+  const ix=IDXR[g.t];
+  const P_=ptOf(g.t),ok=new Uint8Array(P_.length);const conds=Object.entries(g.f).filter(([,v])=>v);
+  for(const pi of ix.pc.keys()){const rows=P_[pi];if(!rows)continue;if(g.pos&&rv(rows,'품사')!==g.pos)continue;
     if(conds.every(([l,v])=>rv(rows,l)===v))ok[pi]=1}
   const li=g.lem?ix.lid.get(g.lem):null;
   const hits=scan(ix,i=>ok[ix.m[i]]===1&&(li==null||ix.l[i]===li),g.book);
-  const lx=g.lem?LEX[g.t==='ot'?'hlx':'glx']?.[g.lem]:null;
+  const lx=g.lem?lexOf(g.t,g.lem):null;
   const desc=[g.pos||'모든 품사',...conds.map(([l,v])=>v),lx?lx[0]:null].filter(Boolean);
   S.view='res';S.res={kind:'gram',t:g.t,hits,book:0,shown:40,desc};drawRes();
 }
@@ -547,15 +632,15 @@ function drawRes(){
   if(R.loading){sk.innerHTML=h+'<div class="hint">찾는 중입니다…</div>';return}
   if(R.err){sk.innerHTML=h+'<div class="hint">검색 자료를 불러오지 못했습니다. 인터넷 연결을 확인하거나, 미리 "전체 저장"을 해 두세요.</div>';return}
   const ot=R.t==='ot',ix=IDXR[R.t];
-  if(R.kind==='lem'){const lx=LEX[ot?'hlx':'glx']?.[R.key];
-    h+=`<div class="rhead"><span class="l${ot?' h':''}">${esc(lx?lx[0]:R.key)}</span><span class="lt">${lx?(ot?fmtTr(lx[1],true):esc(lx[1])):''}</span><span class="tag">${esc(R.key)}</span></div>${lx?`<div class="gl">기본 뜻: ${esc(lx[2])}</div>`:''}`}
+  if(R.kind==='lem'){const lx=lexOf(R.t,R.key);const sk_=R.t==='lxx'?(lx?.[3]||''):R.key;
+    h+=`<div class="rhead"><span class="l${ot?' h':''}">${esc(lx?lx[0]:R.key)}</span><span class="lt">${lx?(ot?fmtTr(lx[1],true):esc(lx[1])):''}</span>${sk_?`<span class="tag">${esc(sk_)}</span>`:''}</div>${lx?`<div class="gl">기본 뜻: ${esc(lx[2])}</div>`:''}`}
   else h+=`<div class="rhead"><span style="font:500 1.15rem var(--sans)">${R.desc.map(esc).join(' · ')}</span></div>`;
   const bc=new Map();for(const x of R.hits)bc.set(x[0],(bc.get(x[0])||0)+1);
-  h+=`<div class="rsum">${ot?'구약':'신약'}에서 <b>${R.hits.length.toLocaleString()}회</b> · ${bc.size}권</div>`;
+  h+=`<div class="rsum">${corpName(R.t)}에서 <b>${R.hits.length.toLocaleString()}회</b> · ${bc.size}권</div>`;
   if(R.kind==='lem'&&ix.en[R.li]){h+=`<div class="sec">BSB 영어 번역</div><div class="chips">${ix.en[R.li].map(([e,n])=>`<span class="chip">${esc(e)}<b>${n}</b></span>`).join('')}</div>`}
   if(R.kind==='gram'&&!S.g.lem&&R.hits.length){const lc=new Map();for(const x of R.hits){const l=ix.l[x[5]];if(l>=0)lc.set(l,(lc.get(l)||0)+1)}
-    const top=[...lc].sort((a,b)=>b[1]-a[1]).slice(0,12),LX=LEX[ot?'hlx':'glx']||{};
-    h+=`<div class="sec">가장 많이 나오는 단어 (누르면 그 단어로 좁힘)</div><div class="chips">${top.map(([l,n])=>{const k=ix.lem[l],e=LX[k];return `<button class="chip" data-narrow="${esc(k)}"><bdi>${esc(e?e[0]:k)}</bdi><b>${n}</b></button>`}).join('')}</div>`}
+    const top=[...lc].sort((a,b)=>b[1]-a[1]).slice(0,12);
+    h+=`<div class="sec">가장 많이 나오는 단어 (누르면 그 단어로 좁힘)</div><div class="chips">${top.map(([l,n])=>{const k=ix.lem[l],e=lexOf(R.t,k);return `<button class="chip" data-narrow="${esc(k)}"><bdi>${esc(e?e[0]:k)}</bdi><b>${n}</b></button>`}).join('')}</div>`}
   if(bc.size>1)h+=`<div class="sec">책별 분포 (누르면 그 책만 보기)</div><div class="chips"><button class="chip${R.book?'':' sel'}" data-rb="0">전체<b>${R.hits.length.toLocaleString()}</b></button>${[...bc].map(([b,n])=>`<button class="chip${R.book===b?' sel':''}" data-rb="${b}">${BOOKS[b-1]}<b>${n.toLocaleString()}</b></button>`).join('')}</div>`;
   h+=`<div class="sec">구절 (누르면 그곳으로 이동)</div><div id="hits"></div>`;
   sk.innerHTML=h;fillHits();
@@ -566,19 +651,21 @@ async function fillHits(){
   if(!list.length){el.innerHTML='<div class="hint">찾은 구절이 없습니다.</div>';return}
   el.innerHTML='<div class="hint">구절을 불러오는 중…</div>';
   const books=[...new Set(page.map(x=>x[0]))];const BK={},KO={};
-  try{await Promise.all(books.map(async b=>{BK[b]=await load(bookFile(b));if(opts.ko)KO[b]=await load('krv/'+bookFile(b).slice(6)).catch(()=>null)}))}
+  const lxm=R.t==='lxx';
+  try{await Promise.all(books.map(async b=>{BK[b]=await (lxm?loadL('books/'+bookFile(b).slice(6)):load(bookFile(b)));if(opts.ko)KO[b]=await load('krv/'+bookFile(b).slice(6)).catch(()=>null)}))}
   catch(e){if(R.tok===tok)el.innerHTML='<div class="hint">구절을 불러오지 못했습니다. 인터넷 연결을 확인하거나, 미리 "전체 저장"을 해 두세요.</div>';return}
   if(R.tok!==tok||S.res!==R)return;
   const ot=R.t==='ot';
   // 같은 절에서 여러 번 나오면 한 줄로 묶음
   const rows=[];for(const x of page){const last=rows[rows.length-1];if(last&&last.b===x[0]&&last.c===x[1]&&last.vi===x[2])last.hs.push(x);else rows.push({b:x[0],c:x[1],vi:x[2],hs:[x]})}
   el.innerHTML=rows.map(r=>{const ch=BK[r.b].c.find(y=>y[0]===r.c);const v=ch&&ch[1][r.vi];if(!v)return'';
-    const [vn,,words,et]=v;const ws=new Set(r.hs.map(x=>x[3]));const gs=new Set(r.hs.map(x=>words[x[3]]?.[3][x[4]]?.[4]).filter(g=>g>=0));
+    const [vn,,words]=v,et=lxm?[]:v[3];const ws=new Set(r.hs.map(x=>x[3]));const gs=new Set(r.hs.map(x=>words[x[3]]?.[3][x[4]]?.[4]).filter(g=>g>=0));
     const gk=words.map((w,wi)=>{const t=esc(ot?heb(w[0]):w[0]);return (ws.has(wi)?`<mark>${t}</mark>`:t)+(ot?(w[1]===''?'':' '):esc(w[1]||' '))}).join('');
     const en=et.map(t=>(gs.has(t[2])?`<mark>${esc(t[0])}</mark>`:esc(t[0]))+(t[1]&1?'':' ')).join('');
-    const vl=(Array.isArray(vn)?vn:[vn]);const kc=KO[r.b]?.[String(r.c)]||{};const ko=opts.ko?vl.map(x=>kc[String(x)]).filter(x=>x&&x!=='(없음)').join(' '):'';
+    const vl=(Array.isArray(vn)?vn:[vn]);const er=lxm?erOf(v,r.c):vl.map(x=>[r.c,x]);
+    const ko=opts.ko&&KO[r.b]?er.map(([x,y])=>(KO[r.b][String(x)]||{})[String(y)]).filter(x=>x&&x!=='(없음)').join(' '):'';
     const f=r.hs[0];
-    return `<div class="hit" tabindex="0" data-hit="${r.b}.${r.c}.${r.vi}.${f[3]}.${f[4]}"><div class="href">${BOOKS[r.b-1]} ${r.c}:${vl.map(x=>x===0?'표제':x).join(',')}${r.hs.length>1?` · ${r.hs.length}번`:''}</div><div class="gk${ot?' he':''}" lang="${ot?'he':'grc'}">${gk}</div>${opts.en?`<div class="en" lang="en">${en}</div>`:''}${ko?`<div class="ko" lang="ko">${esc(ko)}</div>`:''}</div>`}).join('')+
+    return `<div class="hit" tabindex="0" data-hit="${R.t}.${r.b}.${r.c}.${r.vi}.${f[3]}.${f[4]}"><div class="href">${BOOKS[r.b-1]} ${r.c}:${vl.map(x=>x===0?'표제':esc(x)).join(',')}${lxm?' (70인경)':''}${r.hs.length>1?` · ${r.hs.length}번`:''}</div><div class="gk${ot?' he':''}" lang="${ot?'he':'grc'}">${gk}</div>${opts.en&&!lxm?`<div class="en" lang="en">${en}</div>`:''}${ko?`<div class="ko" lang="ko">${esc(ko)}</div>`:''}</div>`}).join('')+
     (list.length>R.shown?`<button class="pill" style="margin-top:16px" data-s="more">더 보기 (${(list.length-R.shown).toLocaleString()}개 남음)</button>`:'');
 }
 sk.addEventListener('input',e=>{if(e.target.id==='sq'){S.q=e.target.value;drawHomeBody()}else if(e.target.id==='glq')gramCands()});
@@ -601,7 +688,8 @@ sk.addEventListener('click',e=>{const t=e.target;
   const rf=t.closest('[data-ref]');if(rf){const [b,c,v]=rf.dataset.ref.split('.').map(Number);closeSearch();return go(b,c,v?{v}:null)}
   const cd=t.closest('[data-cand]');if(cd){const [tt,k]=cd.dataset.cand.split('|');return openConc(tt,k)}
   const rb=t.closest('[data-rb]');if(rb){S.res.book=+rb.dataset.rb;S.res.shown=40;return drawRes()}
-  const hi=t.closest('[data-hit]');if(hi){const [b,c,vi,wi,pi]=hi.dataset.hit.split('.').map(Number);closeSearch();return go(b,c,{vi,wi,pi})}});
+  const hi=t.closest('[data-hit]');if(hi){const [tt,...rest]=hi.dataset.hit.split('.');const [b,c,vi,wi,pi]=rest.map(Number);closeSearch();
+    if(tt!=='nt'&&opts.lxx!==(tt==='lxx')){opts.lxx=tt==='lxx';saveOpts()}return go(b,c,{vi,wi,pi})}});
 panel.innerHTML=emptyHTML;
 go(state.b,state.c);
 </script>
