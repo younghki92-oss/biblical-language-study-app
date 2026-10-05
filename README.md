@@ -54,5 +54,6 @@ python3 tools/build_lxx.py
 ```
 
 - 원자료: `_원자료/lxx/` (github.com/eliranwong/LXX-Rahlfs-1935, STEPBible TVTMS)
+- 70인경 ↔ 영어 강조: CCAT의 CATSS 대조 본문(히브리어 ↔ 70인경, E. Tov, `_원자료/lxx/par/`)으로 70인경 낱말 → 히브리어 낱말을 잇고, 히브리어 낱말의 BSB 영어 짝을 씁니다 (`tools/lxx_align.py`).
 - 결과: `_개인자료/원어성경_70인경.json.gz` (`.gitignore`로 GitHub에서 제외)
 - 앱에서: 책 선택 화면 아래 **70인경 자료 불러오기** → 위 파일 선택. 앱의 이 기기 저장소(`lxx-private`)에만 들어갑니다.

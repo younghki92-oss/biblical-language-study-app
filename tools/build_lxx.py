@@ -130,6 +130,10 @@ for i,(start,bn,c,v) in enumerate(VERSES):
     ch=books.setdefault(b,collections.OrderedDict()).setdefault(cc,[])
     ch.append([v,er if er!=[(cc,n)] else 0,words])
 out={b:{'b':b,'c':[[c,vs] for c,vs in chs.items()]} for b,chs in books.items()}
+# 70인경 낱말 -> 히브리어 낱말 짝 (CATSS 대조 본문). 낱말 뒤에 [[영어 장, 절 순서, 단어 순서], ...] 가 붙음
+import lxx_align
+st=lxx_align.build(ROOT,out)
+print('align',dict(st),'heb %.0f%%'%(100*st['heb_hit']/max(1,st['heb_tok'])),'grk %.0f%%'%(100*st['grk_hit']/max(1,st['grk_tok'])))
 print('books',len(out),'lex',len(LEX),'pt',len(PT),dict(stats))
 # ---------- 검색 색인 (build_extra.py와 같은 구조)
 lem=[];lid={};V=[];L=[];M=[];Wn=[]
