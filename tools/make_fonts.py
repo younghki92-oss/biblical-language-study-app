@@ -10,7 +10,7 @@ for hi in range(0xB0,0xC9):
         try: chars.add(bytes([hi,lo]).decode('euc-kr'))
         except UnicodeDecodeError: pass
 # 앱 화면과 데이터에 실제로 나오는 한글
-for f in [os.path.join(ROOT,'index.html'),os.path.join(ROOT,'data','pt.json')]:
+for f in [os.path.join(ROOT,'index.html'),os.path.join(ROOT,'data','pt.json')]+sorted(glob.glob(os.path.join(ROOT,'data','krv','*.json'))):
     if os.path.exists(f): chars|={c for c in open(f,encoding='utf-8').read() if '가'<=c<='힣' or 'ㄱ'<=c<='ㆎ'}
 text=''.join(sorted(chars))
 css=[]

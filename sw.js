@@ -1,7 +1,7 @@
 // 원어 성경 서비스 워커: 인터넷 없이도 앱이 열리도록 파일을 기기에 보관합니다.
 // 앱 화면(index.html 등)을 고친 뒤에는 VERSION 숫자를 올려 주세요. 그래야 설치된 앱도 새 화면으로 바뀝니다.
-// 성경 데이터(data/books)를 다시 만들었을 때는 DATA_CACHE 숫자를 올려 주세요(index.html의 DATA_CACHE도 같이).
-const VERSION = 'v1';
+// 성경 데이터(data/books, krv, search)를 다시 만들었을 때는 DATA_CACHE 숫자를 올려 주세요(index.html의 DATA_CACHE도 같이).
+const VERSION = 'v2';
 const CORE_CACHE = 'ob-core-' + VERSION;
 const DATA_CACHE = 'ob-data-v1';
 const CORE = [
@@ -31,8 +31,8 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
-  // 성경 책 파일: 저장된 것이 있으면 바로 쓰고, 없으면 받아서 저장
-  if (url.pathname.includes('/data/books/')) {
+  // 성경 책, 한국어 성경, 검색 자료: 저장된 것이 있으면 바로 쓰고, 없으면 받아서 저장
+  if (/\/data\/(books|krv|search)\//.test(url.pathname)) {
     e.respondWith(caches.open(DATA_CACHE).then(async c => {
       const hit = await c.match(req, { ignoreSearch: true });
       if (hit) return hit;

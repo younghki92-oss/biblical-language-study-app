@@ -12,6 +12,8 @@
 | `sw.js` | 인터넷 없이 작동하게 하는 보관 담당 | O |
 | `data/books/01.json` ~ `66.json` | 책별 본문 데이터 (창세기=01, 마태복음=40, 요한계시록=66) | O |
 | `data/glx.json`, `hlx.json`, `pt.json` | 헬라어 사전, 히브리어 사전, 문법 파싱 표 | O |
+| `data/krv/01.json` ~ `66.json` | 한국어 성경 개역한글판 (책별) | O |
+| `data/search/ot.json`, `nt.json` | 단어·문법 검색용 색인 (구약/신약) | O |
 | `fonts/`, `icons/` | 글꼴과 아이콘 | O |
 | `tools/` | 데이터와 글꼴, 아이콘을 만드는 프로그램 | O (참고용) |
 | `_원자료/` | 내려받은 원본 자료 | X (`.gitignore`로 제외) |
@@ -22,7 +24,13 @@
 python3 tools/build_all.py
 ```
 
-`_원자료/`에 원본 자료가 있어야 합니다. 자료 출처는 index.html 아래쪽 footer에 있습니다.
+```bash
+python3 tools/build_extra.py
+```
+
+두 번째 명령은 검색 색인과 한국어 성경 파일을 만듭니다(첫 번째 명령 결과를 사용).
+
+`_원자료/`에 원본 자료가 있어야 합니다. 자료 출처는 index.html 아래쪽 footer에 있습니다. 개역한글은 bolls.life에서 받은 `_원자료/krv/KRV.json`을 씁니다(대한성서공회 안내에 따라 저작재산권 보호기간 만료, 출처 표시와 원문 유지 필요).
 다시 만든 뒤에는 `sw.js`의 `DATA_CACHE`와 `index.html`의 `DATA_CACHE` 숫자를 함께 올려야(예: `ob-data-v1` → `ob-data-v2`) 설치된 앱도 새 데이터를 받습니다.
 
 ## 화면이나 사전을 고쳤을 때
