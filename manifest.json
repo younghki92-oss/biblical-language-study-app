@@ -2,7 +2,7 @@
   "name": "원어 성경",
   "short_name": "원어 성경",
   "description": "히브리어·헬라어 원어 성경과 BSB 영어 번역을 단어별로 연결해 보여 주는 공부 앱",
-  "id": "./",
+  "id": "/biblical-language-study-app/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

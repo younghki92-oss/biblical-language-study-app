@@ -1,7 +1,7 @@
 // 원어 성경 서비스 워커: 인터넷 없이도 앱이 열리도록 파일을 기기에 보관합니다.
 // 앱 화면(index.html 등)을 고친 뒤에는 VERSION 숫자를 올려 주세요. 그래야 설치된 앱도 새 화면으로 바뀝니다.
 // 성경 데이터(data/books, krv, search)를 다시 만들었을 때는 DATA_CACHE 숫자를 올려 주세요(index.html의 DATA_CACHE도 같이).
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CORE_CACHE = 'ob-core-' + VERSION;
 const DATA_CACHE = 'ob-data-v1';
 const CORE = [
