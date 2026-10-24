@@ -38,6 +38,9 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var
 .title::after{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-3px,-3px);margin-left:10px}
 .bar .sp{flex:1}
 .title .ts{display:none}
+.title.chap{margin-left:-2px}
+.title::after{margin-left:8px}
+@media (max-width:479px){.title{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:1.02rem}.title.chap{margin-left:2px}}
 @media (max-width:479px){.title .tl{display:none}.title .ts{display:inline}}
 .toggle{white-space:nowrap;font:500 .85rem var(--sans);background:none;border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
 .toggle[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -174,6 +177,7 @@ footer p{max-width:640px}
 <header><div class="bar">
   <button class="nav" id="prev" aria-label="이전 장">‹</button>
   <button class="title" id="title" aria-haspopup="dialog">원어 성경</button>
+  <button class="title chap" id="chap" aria-haspopup="dialog" hidden></button>
   <button class="nav" id="nextb" aria-label="다음 장">›</button>
   <div class="sp"></div>
   <button class="toggle" id="tgLx" aria-pressed="false" aria-label="구약을 70인경으로 보기" title="70인경" hidden>LXX</button>
@@ -255,7 +259,8 @@ async function go(b,c,focus){
   state.b=b;state.c=c;state.cp=cp;state.sel=null;closePanel(true);applyLxxBtn();
   try{localStorage.setItem('ob-pos',JSON.stringify({b,c}))}catch(e){}
   const unit=b===19?'편':'장',lx=cp==='lxx'?' (70인경)':'';
-  $('title').innerHTML=`<span class="tl">${BOOKS[b-1]}</span><span class="ts">${BOOKS[b-1].length>4?KO_AB[b-1]:BOOKS[b-1]}</span> ${c}${unit}`;$('title').setAttribute('aria-label',`${BOOKS[b-1]} ${c}${unit}${lx}, 성경 선택`);document.title=`${BOOKS[b-1]} ${c}${lx} — 원어 성경`;
+  $('title').innerHTML=`<span class="tl">${BOOKS[b-1]}</span><span class="ts">${BOOKS[b-1].length>4?KO_AB[b-1]:BOOKS[b-1]}</span>`;$('title').setAttribute('aria-label',`${BOOKS[b-1]}${lx}, 다른 책 고르기`);
+  const ch_=$('chap');ch_.hidden=false;ch_.textContent=`${c}${unit}`;ch_.setAttribute('aria-label',`${c}${unit}, 다른 ${unit} 고르기`);document.title=`${BOOKS[b-1]} ${c}${lx} — 원어 성경`;
   $('prev').disabled=isFirst();$('nextb').disabled=isLast();
   const key=cp+name;
   if(!state.loaded?.[key])text.innerHTML=`<div class="status">${BOOKS[b-1]}${lx} 본문을 불러오는 중입니다…</div>`;
@@ -555,11 +560,12 @@ $('tgLx').onclick=()=>{const b=state.b;
   else{opts.lxx=true;saveOpts();go(b,state.c,{fromHeb:true})}};
 // picker
 let pk={t:'ot',book:null};
-function openPicker(){pk={t:isOT(state.b)?'ot':'nt',book:null};drawPicker();$('picker').classList.add('open');document.body.style.overflow='hidden'}
+function openPicker(atChap){pk={t:isOT(state.b)?'ot':'nt',book:atChap===true?state.b:null};drawPicker();$('picker').classList.add('open');document.body.style.overflow='hidden'}
 function closePicker(){$('picker').classList.remove('open');document.body.style.overflow=''}
 function drawPicker(){
   let h=`<div class="pkhead"><h2>${pk.book?BOOKS[pk.book-1]:'성경 선택'}</h2>${pk.book?'<button class="pill" data-pk="back">책 목록</button>':''}<button class="close" style="position:static;display:block" data-pk="close" aria-label="닫기">×</button></div>`;
   if(!pk.book){
+    h+=`<input class="sq" id="pkref" type="search" enterkeyhint="go" autocomplete="off" placeholder="구절로 바로 가기 (예: 사 1:2, 요 3:16, 시 23)"><div id="pkgo"></div>`;
     h+=`<div class="seg"><button data-pk="ot" aria-pressed="${pk.t==='ot'}">구약 (히브리어)</button><button data-pk="nt" aria-pressed="${pk.t==='nt'}">신약 (헬라어)</button></div>`;
     const r=pk.t==='ot'?[1,39]:[40,66];let g='';for(let b=r[0];b<=r[1];b++)g+=`<button data-bk="${b}" class="${b===state.b?'sel':''}">${BOOKS[b-1]}</button>`;
     h+=`<div class="grid">${g}</div>`;
@@ -624,14 +630,20 @@ async function importLXX(file){
     const e=$('lxst');if(e)e.textContent='70인경 자료를 저장했습니다. 구약을 볼 때 위쪽 LXX 단추를 눌러 보세요.';
   }catch(e){st('이 파일은 70인경 자료 파일이 아니거나 읽을 수 없습니다. 원어성경_70인경.json.gz 파일을 골라 주세요.')}
 }
+// 책 선택 화면의 "구절로 바로 가기"
+function pkRefGo(){const r=parseRef($('pkref')?.value||'');if(!r)return false;closePicker();go(r.b,r.c,{v:r.v});return true}
+$('pk').addEventListener('input',e=>{if(e.target.id!=='pkref')return;const r=parseRef(e.target.value),el=$('pkgo');
+  el.innerHTML=r?`<button class="gotoref" data-pk="refgo">→ ${BOOKS[r.b-1]} ${r.c}${r.b===19?'편':'장'}${r.v?' '+r.v+'절':''} 열기</button>`:(e.target.value.trim()?'<div class="hint" style="margin:-6px 0 12px">책 이름과 장(절)을 함께 써 주세요. 예: 사 1:2, 이사야 1장 2절</div>':'')});
+$('pk').addEventListener('keydown',e=>{if(e.target.id==='pkref'&&e.key==='Enter'){e.preventDefault();pkRefGo()}});
 $('pk').addEventListener('change',e=>{if(e.target.id==='lxfile'&&e.target.files[0])importLXX(e.target.files[0])});
 // 폴드를 접거나 펼쳐 화면 폭이 바뀌면 패널 배치를 다시 맞춤
 matchMedia(WIDE).addEventListener('change',e=>{if(e.matches)document.body.classList.remove('sheet');else if(state.sel)openPanel()});
-$('title').onclick=openPicker;$('sbtn').onclick=()=>openSearch();
+$('title').onclick=()=>openPicker();$('chap').onclick=()=>openPicker(true);$('sbtn').onclick=()=>openSearch();
 $('pk').addEventListener('click',e=>{const t=e.target;
   const a=t.closest('[data-pk]')?.dataset.pk;
   if(a==='close')return closePicker();if(a==='back'){pk.book=null;return drawPicker()}
   if(a==='ot'||a==='nt'){pk.t=a;return drawPicker()}
+  if(a==='refgo')return pkRefGo();
   if(a==='dl')return downloadAll();
   if(a==='lxin')return $('lxfile').click();
   if(a==='lxdel'){if(!confirm('이 기기에서 70인경 자료를 지울까요? 자료 파일이 있으면 언제든 다시 불러올 수 있습니다.'))return;
@@ -848,7 +860,7 @@ sk.addEventListener('click',e=>{const t=e.target;
   const gt=t.closest('[data-gt]');if(gt){S.g={t:gt.dataset.gt,pos:'',f:{},lem:null,book:0};return drawHomeBody()}
   const gl=t.closest('[data-glem]');if(gl){S.g.lem=gl.dataset.glem||null;return drawHomeBody()}
   const nr=t.closest('[data-narrow]');if(nr){S.g.lem=nr.dataset.narrow;return runGram()}
-  const rf=t.closest('[data-ref]');if(rf){const [b,c,v]=rf.dataset.ref.split('.').map(Number);closeSearch();return go(b,c,v?{v}:null)}
+  const rf=t.closest('[data-ref]');if(rf){const [b,c,v]=rf.dataset.ref.split('.').map(Number);closeSearch();return go(b,c,{v})}
   const cd=t.closest('[data-cand]');if(cd){const [tt,k]=cd.dataset.cand.split('|');return openConc(tt,k)}
   const rb=t.closest('[data-rb]');if(rb){S.res.book=+rb.dataset.rb;S.res.shown=40;return drawRes()}
   const hi=t.closest('[data-hit]');if(hi){const [tt,...rest]=hi.dataset.hit.split('.');const [b,c,vi,wi,pi]=rest.map(Number);closeSearch();
